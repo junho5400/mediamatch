@@ -131,6 +131,15 @@ export async function getMediaWithCache(
     const cached = await adminDb.collection("media").doc(docId).get()
     if (cached.exists) {
       const data = cached.data()!
+      // Stale cache guard: older docs were written with empty title/coverImage,
+      // TMDB genre_ids as numbers, or numeric IDs cast to strings ("35"). Refetch.
+      const genresStale = Array.isArray(data.genres) && data.genres.some(
+        (g: unknown) => typeof g !== "string" || /^\d+$/.test(g as string)
+      )
+      const contentStale = !data.title || (!data.coverImage && mediaType !== "book")
+      if (genresStale || contentStale) {
+        throw new Error("stale cache")
+      }
       let backdropImage = data.backdropImage
 
       // Backfill backdrop if missing (for items cached before we added this field)
@@ -162,6 +171,7 @@ export async function getMediaWithCache(
         rating: data.rating,
         totalRatings: data.totalRatings,
         authors: data.authors,
+        stats: data.stats,
         externalId,
       }
     }
@@ -204,14 +214,15 @@ export async function getMediaWithCache(
     console.error(`API fetch failed for ${docId}:`, err)
   }
 
-  // Cache in Firestore for future use
+  // Cache in Firestore for future use. Merge to preserve sibling fields
+  // like `stats` that are written by the rating pipeline.
   if (item) {
     try {
       await adminDb.collection("media").doc(docId).set({
         ...item,
         type: mediaType,
         updatedAt: new Date(),
-      })
+      }, { merge: true })
     } catch {
       // Cache write failure is non-fatal
     }

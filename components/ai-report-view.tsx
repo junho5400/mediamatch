@@ -1,168 +1,255 @@
 "use client"
 
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts"
+import { useState } from "react"
 import Image from "next/image"
-import { AIReport } from "@/types/ai-report"
+import { useRouter } from "next/navigation"
+import { ChevronDown, ArrowLeft } from "lucide-react"
 import { UserProfile } from "@/types/database"
+import { AIReport, MBTITrait } from "@/types/ai-report"
 
 interface AIReportViewProps {
   profile: UserProfile
   report: AIReport
 }
 
+function formatDate(d: unknown): string {
+  if (!d) return ""
+  let date: Date | null = null
+  if (d instanceof Date) date = d
+  else if (typeof d === "object" && d !== null && "toDate" in d) {
+    date = (d as { toDate: () => Date }).toDate()
+  } else if (typeof d === "object" && d !== null && "_seconds" in d) {
+    // Firestore Timestamp serialized to JSON: { _seconds, _nanoseconds }
+    date = new Date((d as { _seconds: number })._seconds * 1000)
+  } else if (typeof d === "object" && d !== null && "seconds" in d) {
+    date = new Date((d as { seconds: number }).seconds * 1000)
+  } else if (typeof d === "string" || typeof d === "number") {
+    const parsed = new Date(d)
+    if (!isNaN(parsed.getTime())) date = parsed
+  }
+  if (!date || isNaN(date.getTime())) return ""
+  return date.toLocaleDateString("en-US", { month: "long", year: "numeric" })
+}
+
 export default function AIReportView({ profile, report }: AIReportViewProps) {
-  // Define premium chart colors 
-  const chartColors = [
-    "#6366f1", // indigo-500
-    "#8b5cf6", // violet-500
-    "#a855f7", // purple-500
-    "#d946ef", // fuchsia-500
-    "#ec4899", // pink-500
-  ]
-
+  const router = useRouter()
   return (
-    <div className="max-w-4xl mx-auto py-10 px-4 md:px-6">
-      {/* Cinematic Header */}
-      <div className="text-center mb-12 space-y-4">
-        <h1 className="text-4xl md:text-5xl font-bold tracking-tight bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-transparent bg-clip-text">
-          Your Media DNA
-        </h1>
-        <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
-          AI-powered analysis of your unique taste profile
-        </p>
-      </div>
+    <div className="max-w-[1100px] mx-auto px-4 sm:px-6 lg:px-8 pt-10 pb-24">
+      {/* ── Back ── */}
+      <button
+        type="button"
+        onClick={() => router.back()}
+        className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors mb-10"
+      >
+        <ArrowLeft className="h-3 w-3" />
+        Back to profile
+      </button>
 
-      {/* Persona Summary - with premium styling */}
-      <Card className="mb-10 overflow-hidden border-0 rounded-xl shadow-[0_8px_20px_-8px_rgba(0,0,0,0.12)] relative">
-        {/* Decorative background element */}
-        <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-bl from-indigo-500/10 to-transparent opacity-60 rounded-xl"></div>
-        
-        <div className="relative z-10">
-          <CardHeader className="pb-2">
-            <div className="space-y-2">
-              <CardTitle className="text-3xl font-bold tracking-tight">{report.personaName}</CardTitle>
-              <CardDescription className="text-base">{report.tagline}</CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {report.personaDetails.tags.map((tag) => (
-                <Badge 
-                  key={tag} 
-                  className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 
-                             hover:bg-indigo-100 dark:hover:bg-indigo-900/50 backdrop-blur-sm border border-indigo-200/50
-                             dark:border-indigo-800/50 px-2.5 py-0.5 rounded-full font-medium"
-                >
-                  {tag}
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </div>
-      </Card>
+      <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr] gap-12 lg:gap-16">
 
-      {/* Two column premium layout for medium screens and up */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-8 mb-10">
-        {/* Insight Text - with premium styling */}
-        <Card className="md:col-span-7 border-0 rounded-xl shadow-[0_8px_20px_-8px_rgba(0,0,0,0.12)]">
-          <CardHeader>
-            <CardTitle className="text-2xl font-semibold tracking-tight">What Makes You Unique</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-foreground/80 leading-relaxed whitespace-pre-line text-base">{report.insightText}</p>
-          </CardContent>
-        </Card>
-
-        {/* Media Personality - with premium styling */}
-        <Card className="md:col-span-5 border-0 rounded-xl shadow-[0_8px_20px_-8px_rgba(0,0,0,0.12)]">
-          <CardHeader>
-            <CardTitle className="text-2xl font-semibold tracking-tight">Media Personality</CardTitle>
-            <CardDescription className="text-base">How you approach stories and experiences</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-8">
-            {report.mediaPersonality.map((trait) => (
-              <div key={trait.name} className="space-y-2">
-                <div className="flex justify-between text-sm font-medium">
-                  <span className="text-foreground/70">{trait.left}</span>
-                  <span className="text-foreground/70">{trait.right}</span>
-                </div>
-                <div className="relative h-2.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                  {/* Slider marker instead of a progress bar */}
-                  <div className="absolute top-0 bottom-0 w-full">
-                    <div 
-                      className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 
-                               shadow-[0_0_10px_rgba(99,102,241,0.5)] z-10"
-                      style={{ left: `calc(${trait.value}% - 8px)` }}
-                    ></div>
-                    {/* Track lines for orientation */}
-                    <div className="absolute left-[25%] top-0 bottom-0 w-px h-full bg-slate-300 dark:bg-slate-700"></div>
-                    <div className="absolute left-[50%] top-0 bottom-0 w-px h-full bg-slate-300 dark:bg-slate-700"></div>
-                    <div className="absolute left-[75%] top-0 bottom-0 w-px h-full bg-slate-300 dark:bg-slate-700"></div>
-                  </div>
-                </div>
-                <div className="text-xs text-center font-medium text-foreground/60 mt-1">{trait.name}</div>
+        {/* ══ Sticky profile card ══ */}
+        <aside className="lg:sticky lg:top-20 lg:self-start space-y-6">
+          <div>
+            {profile.photoURL ? (
+              <div className="relative h-20 w-20 rounded-full overflow-hidden">
+                <Image src={profile.photoURL} alt={profile.displayName} fill className="object-cover" sizes="80px" />
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
+            ) : (
+              <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center text-2xl font-bold text-muted-foreground">
+                {profile.displayName?.charAt(0) || "?"}
+              </div>
+            )}
+          </div>
 
-      {/* Genre Chart - with premium styling */}
-      <Card className="border-0 rounded-xl shadow-[0_8px_20px_-8px_rgba(0,0,0,0.12)]">
-        <CardHeader>
-          <CardTitle className="text-2xl font-semibold tracking-tight">Genre Preferences</CardTitle>
-        </CardHeader>
-        <CardContent style={{ height: 350 }}>
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart 
-              data={report.genres} 
-              margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
-              className="[&_.recharts-cartesian-grid-horizontal_line]:stroke-slate-200 
-                         [&_.recharts-cartesian-grid-horizontal_line]:stroke-dasharray-[3,3]
-                         dark:[&_.recharts-cartesian-grid-horizontal_line]:stroke-slate-700"
-            >
-              <XAxis 
-                dataKey="name" 
-                tick={{ fill: 'var(--foreground)', opacity: 0.8 }}
-                axisLine={{ stroke: 'var(--border)' }}
-                tickLine={false}
-                dy={10}
-              />
-              <YAxis 
-                tick={{ fill: 'var(--foreground)', opacity: 0.8 }}
-                axisLine={{ stroke: 'var(--border)' }}
-                tickLine={false}
-                dx={-10}
-              />
-              <Tooltip 
-                contentStyle={{
-                  backgroundColor: 'var(--card)',
-                  borderColor: 'var(--border)',
-                  borderRadius: 'var(--radius)',
-                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-                  color: 'var(--card-foreground)',
-                  padding: '12px'
-                }}
-                cursor={{ fill: 'rgba(0, 0, 0, 0.05)' }}
-                formatter={(value) => [`${value}%`, 'Percentage']}
-              />
-              <Bar 
-                dataKey="percentage" 
-                radius={[6, 6, 0, 0]}
-                animationDuration={1500}
-                className="[&_path]:transition-all [&_path]:duration-300 
-                           [&_path:hover]:opacity-80 [&_path]:cursor-pointer"
-              >
-                {report.genres.map((entry, index) => (
-                  <rect key={`rect-${index}`} fill={chartColors[index % chartColors.length]} />
+          <div className="space-y-1">
+            <h2 className="text-base font-semibold tracking-tight">{profile.displayName}</h2>
+            {profile.createdAt && (
+              <p className="text-[11px] text-muted-foreground">Since {formatDate(profile.createdAt)}</p>
+            )}
+          </div>
+
+          <div className="border-t border-border/60 pt-4 space-y-3">
+            <div className="flex items-baseline justify-between text-xs">
+              <span className="text-muted-foreground">Rated</span>
+              <span className="font-semibold tabular-nums">{profile.stats?.totalRatings ?? 0}</span>
+            </div>
+            <div className="flex items-baseline justify-between text-xs">
+              <span className="text-muted-foreground">Avg</span>
+              <span className="font-semibold tabular-nums">
+                {(profile.stats?.averageRating ?? 0).toFixed(1)}
+                <span className="text-muted-foreground/60 font-normal">/5</span>
+              </span>
+            </div>
+          </div>
+
+          {/* Favorites */}
+          {profile.favoriteMedia && (
+            <div className="border-t border-border/60 pt-4 space-y-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">Favorites</p>
+              <div className="grid grid-cols-3 gap-2">
+                {(["movie", "tv", "book"] as const).map(type => {
+                  const fav = profile.favoriteMedia?.[type]
+                  if (!fav?.coverImage) {
+                    return (
+                      <div key={type} className="aspect-[2/3] rounded-sm bg-muted/60" />
+                    )
+                  }
+                  return (
+                    <div key={type} className="relative aspect-[2/3] rounded-sm overflow-hidden">
+                      <Image src={fav.coverImage} alt={fav.title} fill className="object-cover" sizes="80px" />
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </aside>
+
+        {/* ══ Right column: report ══ */}
+        <main>
+          {/* ── Hero ── */}
+          <header className="space-y-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Media DNA
+            </p>
+            <h1 className="text-4xl sm:text-5xl font-bold tracking-tight leading-[1.05]">
+              {report.personaName}
+            </h1>
+            <p className="max-w-2xl text-base text-foreground/65 italic leading-relaxed">
+              &ldquo;{report.tagline}&rdquo;
+            </p>
+            {report.personaDetails?.tags?.length ? (
+              <div className="flex flex-wrap gap-x-3 gap-y-1 pt-1 text-[11px] text-muted-foreground">
+                {report.personaDetails.tags.map((tag, i) => (
+                  <span key={tag} className="flex items-center gap-3">
+                    {i > 0 && <span className="text-border">·</span>}
+                    {tag}
+                  </span>
                 ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+              </div>
+            ) : null}
+          </header>
+
+          {/* ── Genres + Personality side-by-side ── */}
+          <section className="border-t border-border/60 mt-12 pt-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-5">
+                  Genres
+                </p>
+                <GenreList genres={report.genres} />
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground mb-5">
+                  Personality
+                </p>
+                <div className="space-y-7">
+                  {(report.mediaPersonality || []).map(trait => (
+                    <TraitAxis key={trait.name} {...trait} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* ── Analysis (collapsible) ── */}
+          <Analysis text={report.insightText} />
+        </main>
+      </div>
     </div>
+  )
+}
+
+/* ──────────────────────────────────────────────────────────── */
+
+function GenreList({ genres }: { genres: { name: string; percentage: number }[] }) {
+  if (!genres?.length) {
+    return <p className="text-sm text-muted-foreground">No genre data yet.</p>
+  }
+  const max = Math.max(...genres.map(g => g.percentage), 1)
+  return (
+    <div className="space-y-3.5">
+      {genres.slice(0, 6).map(g => {
+        const pct = (g.percentage / max) * 100
+        return (
+          <div key={g.name}>
+            <div className="flex items-baseline justify-between mb-1.5">
+              <span className="text-[13px] font-medium text-foreground">{g.name}</span>
+              <span className="text-[11px] text-muted-foreground tabular-nums">{g.percentage.toFixed(0)}%</span>
+            </div>
+            <div className="relative h-px w-full bg-border">
+              {/* matte fill */}
+              <div
+                className="absolute inset-y-0 left-0 bg-foreground/40"
+                style={{ width: `${pct}%` }}
+              />
+              {/* pink tip — only the rightmost edge */}
+              <div
+                className="absolute top-1/2 -translate-y-1/2 h-[3px] w-2 bg-primary"
+                style={{ left: `calc(${pct}% - 8px)` }}
+              />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/* ──────────────────────────────────────────────────────────── */
+
+function TraitAxis({ left, right, value, name }: MBTITrait) {
+  const clamped = Math.max(0, Math.min(100, value))
+  return (
+    <div>
+      <div className="flex items-baseline justify-between text-[11px] mb-2.5">
+        <span className="text-muted-foreground">{left}</span>
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground/50">{name}</span>
+        <span className="text-muted-foreground">{right}</span>
+      </div>
+      <div className="relative h-px w-full bg-border">
+        {/* center tick */}
+        <span aria-hidden className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-1.5 w-px bg-border" />
+        <div
+          className="absolute top-1/2 h-2 w-2 rounded-full bg-primary ring-2 ring-background"
+          style={{ left: `${clamped}%`, transform: "translate(-50%, -50%)" }}
+          aria-hidden
+        />
+      </div>
+    </div>
+  )
+}
+
+/* ──────────────────────────────────────────────────────────── */
+
+function Analysis({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <section className="border-t border-border/60 mt-12 pt-6">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        className="group w-full flex items-center justify-between text-left"
+      >
+        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground group-hover:text-foreground transition-colors">
+          Analysis
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 text-muted-foreground transition-transform duration-300 ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      <div
+        className={`grid transition-[grid-template-rows] duration-500 ease-out ${
+          open ? "grid-rows-[1fr] mt-5" : "grid-rows-[0fr] mt-0"
+        }`}
+      >
+        <div className="overflow-hidden">
+          <p className="text-[14px] leading-[1.78] text-foreground/85 whitespace-pre-line max-w-2xl">
+            {text}
+          </p>
+        </div>
+      </div>
+    </section>
   )
 }

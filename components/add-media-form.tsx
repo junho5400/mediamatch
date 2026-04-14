@@ -31,7 +31,12 @@ const formSchema = z.object({
   addToWatchlist: z.boolean().optional(),
 })
 
-export default function AddMediaForm() {
+interface AddMediaFormProps {
+  prefilledMediaId?: string | null
+  onSuccess?: () => void
+}
+
+export default function AddMediaForm({ prefilledMediaId, onSuccess }: AddMediaFormProps = {}) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
@@ -42,9 +47,9 @@ export default function AddMediaForm() {
   const [isLoadingMedia, setIsLoadingMedia] = useState(false)
   const [selectedType, setSelectedType] = useState<MediaType>('movie')
 
-  // Fetch pre-selected media if mediaId is provided in URL
+  // Fetch pre-selected media — prefer the prop, fall back to URL param
   useEffect(() => {
-    const mediaId = searchParams.get('mediaId')
+    const mediaId = prefilledMediaId ?? searchParams.get('mediaId')
     if (mediaId) {
       const fetchMedia = async () => {
         setIsLoadingMedia(true)
@@ -67,7 +72,7 @@ export default function AddMediaForm() {
       }
       fetchMedia()
     }
-  }, [searchParams, toast])
+  }, [prefilledMediaId, searchParams, toast])
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -147,10 +152,14 @@ export default function AddMediaForm() {
         description: "Media added to your library",
       })
 
-      // Navigate to the profile page after successful addition
-      const user = auth.currentUser
-      if (user) {
-        router.push(`/profile/${user.uid}`)
+      if (onSuccess) {
+        onSuccess()
+      } else {
+        // Standalone /add page → navigate to profile after submit
+        const user = auth.currentUser
+        if (user) {
+          router.push(`/profile/${user.uid}`)
+        }
       }
     } catch {
       toast({
@@ -174,64 +183,58 @@ export default function AddMediaForm() {
     }
   };
 
+  const isInDialog = onSuccess !== undefined
+
   return (
     <div className="space-y-8">
-      <div>
-        <h2 className="text-2xl font-semibold">Log your media</h2>
-        <p className="text-sm text-muted-foreground">What did you watch/read?</p>
-      </div>
+      {!isInDialog && (
+        <div>
+          <h2 className="text-2xl font-semibold">Log your media</h2>
+          <p className="text-sm text-muted-foreground">What did you watch/read?</p>
+        </div>
+      )}
 
       {!selectedMedia && !isLoadingMedia && (
-        <div className="space-y-4">
-          <div className="flex flex-col items-center gap-2">
-            <p className="text-sm text-muted-foreground">Search by category:</p>
-            <div className="flex gap-2">
-              <Button
-                variant={selectedType === 'movie' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSelectedType('movie')}
-              >
-                <Film className="mr-2 h-4 w-4" />
-                Movies
-              </Button>
-              <Button
-                variant={selectedType === 'tv' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSelectedType('tv')}
-              >
-                <Tv className="mr-2 h-4 w-4" />
-                TV Shows
-              </Button>
-              <Button
-                variant={selectedType === 'book' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setSelectedType('book')}
-              >
-                <BookOpen className="mr-2 h-4 w-4" />
-                Books
-              </Button>
+        <div className="space-y-5 border-t border-border/60 pt-6">
+          <div className="space-y-3">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Type</p>
+            <div className="flex gap-1">
+              {([
+                { value: 'movie' as const, icon: Film, label: 'Movies' },
+                { value: 'tv' as const, icon: Tv, label: 'TV' },
+                { value: 'book' as const, icon: BookOpen, label: 'Books' },
+              ]).map(({ value, icon: Icon, label }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setSelectedType(value)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 text-[12px] font-medium transition-colors border-b -mb-px
+                    ${selectedType === value
+                      ? "border-primary text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground"}`}
+                >
+                  <Icon className="h-3 w-3" />{label}
+                </button>
+              ))}
             </div>
           </div>
 
           <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
+            <Search className="absolute left-0 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+            <input
+              type="text"
               placeholder={getSearchPlaceholder()}
-              className="pl-8"
+              className="w-full pl-6 pr-8 py-2 text-sm bg-transparent border-0 border-b border-border focus:border-primary focus:outline-none transition-colors placeholder:text-muted-foreground/60"
               value={searchQuery}
               onChange={(e) => handleSearchInput(e.target.value)}
             />
             {isSearching && (
-              <div className="absolute right-2.5 top-2.5">
-                <Loader2 className="h-4 w-4 animate-spin" />
-              </div>
+              <Loader2 className="absolute right-0 top-1/2 -translate-y-1/2 h-3.5 w-3.5 animate-spin text-muted-foreground" />
             )}
           </div>
 
           {searchResults.length > 0 && (
-            <div className="max-w-4xl">
-              <MediaSearchResults results={searchResults} onSelect={handleSelectMedia} />
-            </div>
+            <MediaSearchResults results={searchResults} onSelect={handleSelectMedia} />
           )}
         </div>
       )}
@@ -243,151 +246,137 @@ export default function AddMediaForm() {
       )}
 
       {selectedMedia && (
-        <div className="flex items-center gap-4 p-4 border rounded-lg bg-muted/50">
-          <div className="w-16 h-24 relative overflow-hidden rounded">
+        <div className="flex items-center gap-4 border-t border-b border-border/60 py-5">
+          <div className="relative w-14 h-20 overflow-hidden rounded shrink-0">
             <Image
               src={selectedMedia.coverImage || "/placeholder.svg"}
               alt={selectedMedia.title}
               fill
-              sizes="64px"
+              sizes="56px"
               className="object-cover"
             />
           </div>
-          <div className="flex-1">
-            <h3 className="font-medium">{selectedMedia.title}</h3>
-            <p className="text-sm text-muted-foreground">
-              {selectedMedia.type} • {selectedMedia.releaseDate ? new Date(selectedMedia.releaseDate).getFullYear() : 'N/A'}
+          <div className="flex-1 min-w-0">
+            <h3 className="text-base font-semibold tracking-tight truncate">{selectedMedia.title}</h3>
+            <p className="text-[11px] text-muted-foreground capitalize">
+              {selectedMedia.type}
+              {selectedMedia.releaseDate ? ` · ${new Date(selectedMedia.releaseDate).getFullYear()}` : ''}
+              {selectedMedia.genres?.length ? ` · ${selectedMedia.genres.slice(0, 2).join(', ')}` : ''}
             </p>
-            <div className="flex gap-1 mt-1">
-              {selectedMedia.genres?.slice(0, 3).map((genre) => (
-                <span key={genre} className="text-xs bg-secondary px-2 py-0.5 rounded">
-                  {genre}
-                </span>
-              ))}
-            </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {
-              setSelectedMedia(null)
-              setSearchQuery("")
-            }}
+          <button
+            type="button"
+            onClick={() => { setSelectedMedia(null); setSearchQuery("") }}
+            className="text-muted-foreground hover:text-foreground p-1"
+            aria-label="Clear selection"
           >
             <X className="h-4 w-4" />
-            <span className="sr-only">Clear selection</span>
-          </Button>
+          </button>
         </div>
       )}
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-7 pt-2">
           <FormField
             control={form.control}
             name="rating"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Rating</FormLabel>
+              <FormItem className="space-y-2.5">
+                <FormLabel className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Rating</FormLabel>
                 <FormControl>
                   <Rating
                     value={field.value || 0}
                     onChange={field.onChange}
+                    size="sm"
                   />
                 </FormControl>
-                <FormDescription>
-                  Rate this media from 0.5 to 5 stars
-                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
 
-          <FormField
-            control={form.control}
-            name="date"
-            render={({ field }) => (
-              <FormItem className="flex flex-col">
-                <FormLabel>When did you watch/read it?</FormLabel>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <FormControl>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-[240px] pl-3 text-left font-normal",
-                          !field.value && "text-muted-foreground"
-                        )}
-                      >
-                        {field.value ? (
-                          format(field.value, "PPP")
-                        ) : (
-                          <span>Pick a date</span>
-                        )}
-                        <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                      </Button>
-                    </FormControl>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={field.value}
-                      onSelect={field.onChange}
-                      disabled={(date) =>
-                        date > new Date() || date < new Date("1900-01-01")
-                      }
-                      initialFocus
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <FormField
+              control={form.control}
+              name="date"
+              render={({ field }) => (
+                <FormItem className="flex flex-col space-y-2.5">
+                  <FormLabel className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Watched / Read on</FormLabel>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <button
+                          type="button"
+                          className={cn(
+                            "flex items-center justify-between w-full text-left text-sm py-2 border-b border-border hover:border-primary/60 transition-colors",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                          <CalendarIcon className="h-3.5 w-3.5 opacity-50" />
+                        </button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={field.onChange}
+                        disabled={(date) =>
+                          date > new Date() || date < new Date("1900-01-01")
+                        }
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="tags"
+              render={({ field }) => (
+                <FormItem className="space-y-2.5">
+                  <FormLabel className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Tags</FormLabel>
+                  <FormControl>
+                    <input
+                      type="text"
+                      placeholder="thought-provoking, funny, rewatched"
+                      className="w-full text-sm py-2 bg-transparent border-0 border-b border-border focus:border-primary focus:outline-none transition-colors placeholder:text-muted-foreground/60"
+                      {...field}
                     />
-                  </PopoverContent>
-                </Popover>
-                <FormDescription>
-                  Select when you watched or read this media
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-
-          <FormField
-            control={form.control}
-            name="tags"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Tags</FormLabel>
-                <FormControl>
-                  <Input placeholder="e.g. 'thought-provoking', 'funny', 'rewatched'" {...field} />
-                </FormControl>
-                <FormDescription>
-                Add tags to help us better recommend you contents, comma separated
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
 
           <FormField
             control={form.control}
             name="notes"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Notes</FormLabel>
+              <FormItem className="space-y-2.5">
+                <FormLabel className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Review</FormLabel>
                 <FormControl>
                   <Textarea
-                    placeholder="e.g. 'I feel an underlying nostalgia for yesterday's worlds that have never been'"
-                    className="resize-none"
+                    placeholder="What did you think? — your words feed the embedding model."
+                    className="resize-none border-0 border-b border-border rounded-none focus-visible:ring-0 focus-visible:border-primary px-0 text-sm placeholder:text-muted-foreground/60 min-h-[64px]"
                     {...field}
                   />
                 </FormControl>
-                <FormDescription>
-                Add your thoughts or notes about this media to help us better recommend you contents
-                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
 
-          <Button type="submit" disabled={!selectedMedia}>
-            Add to Library
-          </Button>
+          <div className="flex items-center justify-end pt-4 border-t border-border/60">
+            <Button type="submit" disabled={!selectedMedia} className="rounded-full px-6">
+              Add to library
+            </Button>
+          </div>
         </form>
       </Form>
     </div>

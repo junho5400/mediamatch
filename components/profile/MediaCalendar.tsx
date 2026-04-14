@@ -3,12 +3,16 @@
 import { useState } from "react"
 import Image from "next/image"
 import { ChevronLeft, ChevronRight, BookOpen, Film, Tv } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { MediaEntry, MediaType } from "@/types/database"
 import { format } from "date-fns"
 import { Timestamp } from "firebase/firestore"
+
+const TYPE_FILTERS: Array<{ value: MediaType | "all"; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "movie", label: "Movies" },
+  { value: "tv", label: "TV" },
+  { value: "book", label: "Books" },
+]
 
 interface MediaCalendarProps {
   libraryEntries: (MediaEntry & { id: string })[]
@@ -128,65 +132,71 @@ export default function MediaCalendar({
   }
 
   return (
-    <Card className="border-0 rounded-xl shadow-[0_8px_20px_-8px_rgba(0,0,0,0.12)]">
-      <CardHeader className="pb-3 flex flex-row items-center justify-between">
-        <CardTitle className="text-xl font-semibold tracking-tight">Media Calendar</CardTitle>
-        <Select value={selectedMediaType} onValueChange={(v) => onMediaTypeChange(v as MediaType | 'all')}>
-          <SelectTrigger className="w-[120px] h-9 border border-border/50 rounded-lg">
-            <SelectValue placeholder="Filter" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All</SelectItem>
-            <SelectItem value="movie">Movies</SelectItem>
-            <SelectItem value="tv">TV Shows</SelectItem>
-            <SelectItem value="book">Books</SelectItem>
-          </SelectContent>
-        </Select>
-      </CardHeader>
-      <CardContent>
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <button className="p-2 hover:bg-accent rounded-lg transition-colors" onClick={() => navigateMonth('prev')}>
-              <ChevronLeft className="h-5 w-5 text-muted-foreground" />
+    <section>
+      {/* Header row: eyebrow + filters */}
+      <div className="flex items-end justify-between mb-6 gap-4 flex-wrap">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Calendar</p>
+        <div className="flex gap-1">
+          {TYPE_FILTERS.map(({ value, label }) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => onMediaTypeChange(value)}
+              className={`px-2.5 py-1 text-[11px] font-medium transition-colors border-b -mb-px
+                ${selectedMediaType === value
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"}`}
+            >
+              {label}
             </button>
-            <span className="text-xl font-semibold tracking-tight">{formatYearMonth(currentMonth)}</span>
-            <button className="p-2 hover:bg-accent rounded-lg transition-colors" onClick={() => navigateMonth('next')}>
-              <ChevronRight className="h-5 w-5 text-muted-foreground" />
-            </button>
-          </div>
-          <Button variant="outline" size="sm"
-            className="border border-border/50 shadow-sm hover:bg-accent hover:text-accent-foreground"
-            onClick={() => setCurrentMonth(new Date())}>
-            Today
-          </Button>
-        </div>
-
-        <div className="grid grid-cols-7 gap-1 text-center mb-4">
-          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
-            <div key={day} className="text-sm font-medium text-muted-foreground">{day}</div>
           ))}
         </div>
+      </div>
 
-        <div className="grid grid-cols-7 gap-1 text-sm">
-          {Array.from({ length: 35 }, (_, i) => {
-            const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1)
-            const startDay = firstDay.getDay()
-            const day = i - startDay + 1
-            const currentDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day)
-            const isCurrentMonth = currentDate.getMonth() === currentMonth.getMonth()
+      {/* Month nav */}
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <button className="text-muted-foreground hover:text-foreground transition-colors" onClick={() => navigateMonth('prev')}>
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <span className="text-sm font-semibold tabular-nums">{formatYearMonth(currentMonth)}</span>
+          <button className="text-muted-foreground hover:text-foreground transition-colors" onClick={() => navigateMonth('next')}>
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+        <button
+          onClick={() => setCurrentMonth(new Date())}
+          className="text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
+          Today
+        </button>
+      </div>
 
-            return isCurrentMonth ? renderCalendarCell(currentDate) : (
-              <div key={i} className="aspect-square p-1">
-                <div className="relative w-full h-full opacity-30">
-                  <div className="absolute top-1 left-1 text-xs text-muted-foreground">
-                    {day > 0 ? day : day + new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 0).getDate()}
-                  </div>
+      <div className="grid grid-cols-7 gap-1 text-center mb-2">
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+          <div key={day} className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">{day}</div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 text-sm">
+        {Array.from({ length: 35 }, (_, i) => {
+          const firstDay = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1)
+          const startDay = firstDay.getDay()
+          const day = i - startDay + 1
+          const currentDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day)
+          const isCurrentMonth = currentDate.getMonth() === currentMonth.getMonth()
+
+          return isCurrentMonth ? renderCalendarCell(currentDate) : (
+            <div key={i} className="aspect-square p-1">
+              <div className="relative w-full h-full opacity-20">
+                <div className="absolute top-1 left-1 text-[11px] text-muted-foreground">
+                  {day > 0 ? day : day + new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 0).getDate()}
                 </div>
               </div>
-            )
-          })}
-        </div>
-      </CardContent>
-    </Card>
+            </div>
+          )
+        })}
+      </div>
+    </section>
   )
 }

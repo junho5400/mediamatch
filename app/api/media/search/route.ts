@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { searchBooks, searchMovies, searchTVShows } from '@/lib/services/externalMediaService'
-import { MediaItem, MediaType } from '@/types/database'
-import { adminDb } from '@/lib/firebase-admin'
+import { getMediaBatchWithCache } from '@/lib/services/mediaCache'
+import { MediaItem } from '@/types/database'
 import { rateLimit, getClientIP } from '@/lib/rate-limit'
 import { MediaSearchQuerySchema } from '@/lib/validation/schemas'
 
@@ -28,60 +28,48 @@ export async function GET(request: NextRequest) {
   }
 
   const { q: searchQuery, type } = parsed.data
+  const mode = searchParams.get('mode') === 'semantic' ? 'semantic' : 'keyword'
 
   try {
-    // Run keyword search (TMDB/Google Books) and semantic search (ML service) in parallel
-    const keywordPromise = (async () => {
+    if (mode === 'keyword') {
+      let results: MediaItem[] = []
       switch (type) {
-        case 'movie': return searchMovies(searchQuery)
-        case 'tv': return searchTVShows(searchQuery)
-        case 'book': return searchBooks(searchQuery)
+        case 'movie': results = await searchMovies(searchQuery); break
+        case 'tv': results = await searchTVShows(searchQuery); break
+        case 'book': results = await searchBooks(searchQuery); break
         default: {
           const [movies, tvShows, books] = await Promise.all([
             searchMovies(searchQuery),
             searchTVShows(searchQuery),
             searchBooks(searchQuery),
           ])
-          return [...movies, ...tvShows, ...books]
+          results = [...movies, ...tvShows, ...books]
         }
       }
-    })()
+      return NextResponse.json(results)
+    }
 
-    const semanticPromise = (async (): Promise<MediaItem[]> => {
-      try {
-        const res = await fetch(`${ML_SERVICE_URL}/search`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            query: searchQuery,
-            top_k: 5,
-            media_type: type || null,
-          }),
-        })
-        if (!res.ok) return []
-        const data = await res.json()
-        // Semantic results have media_id like "movie-550" — convert to basic MediaItem
-        return (data.recommendations || []).map((r: { media_id: string; title: string; media_type: string; score: number }) => ({
-          id: r.media_id,
-          type: r.media_type as MediaType,
-          title: r.title,
-          description: `Semantic match (${(r.score * 100).toFixed(0)}% relevant)`,
-          externalId: r.media_id.split('-').slice(1).join('-'),
-          isSemanticMatch: true,
-        }))
-      } catch {
-        return [] // ML service down — graceful fallback
-      }
-    })()
-
-    const [keywordResults, semanticResults] = await Promise.all([keywordPromise, semanticPromise])
-
-    // Merge: keyword results first, then semantic results that aren't duplicates
-    const seenTitles = new Set(keywordResults.map(r => r.title.toLowerCase()))
-    const uniqueSemantic = semanticResults.filter(r => !seenTitles.has(r.title.toLowerCase()))
-
-    const results = [...keywordResults, ...uniqueSemantic]
-
+    // Semantic mode: hit the ML service only
+    const res = await fetch(`${ML_SERVICE_URL}/search`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: searchQuery,
+        top_k: 10,
+        media_type: type || null,
+      }),
+    })
+    if (!res.ok) return NextResponse.json([])
+    const data = await res.json()
+    const rawItems = (data.recommendations || []) as Array<{ media_id: string; title: string; media_type: string; score: number }>
+    if (rawItems.length === 0) return NextResponse.json([])
+    const enriched = await getMediaBatchWithCache(rawItems)
+    const scoreById = new Map(rawItems.map(r => [r.media_id, r.score]))
+    const results = enriched.map(item => ({
+      ...item,
+      description: `Semantic match (${((scoreById.get(item.id) ?? 0) * 100).toFixed(0)}% relevant)`,
+      isSemanticMatch: true,
+    }))
     return NextResponse.json(results)
   } catch (error) {
     console.error('Search error:', error)

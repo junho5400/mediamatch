@@ -86,106 +86,91 @@ export default function ProfileView({ profile, isOwnProfile }: ProfileViewProps)
 
   return (
     <div className="min-h-screen">
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-16">
 
         {/* ════ THREE-COLUMN LAYOUT ════ */}
-        <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_300px] gap-4 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-[240px_1fr_260px] gap-12 lg:gap-14 items-start">
 
-          {/* ══ COL 1: Profile ID Card ══ */}
-          <div className="lg:sticky lg:top-20 rounded-2xl border border-border bg-card overflow-hidden">
-            {/* Backdrop */}
-            <div className="relative h-24 bg-muted">
-              {favoriteMedia.movie?.coverImage && (
-                <Image src={favoriteMedia.movie.coverImage} alt="" fill className="object-cover object-[center_30%] brightness-[0.4]" />
-              )}
-              <div className="absolute bottom-0 left-0 right-0 h-12" style={{ background: 'linear-gradient(to top, hsl(var(--card)), transparent)' }} />
+          {/* ══ COL 1: Profile ID — sticky, no card chrome ══ */}
+          <aside className="lg:sticky lg:top-20 lg:self-start space-y-6">
+            <Avatar className="h-20 w-20">
+              <AvatarImage src={profile.photoURL || undefined} />
+              <AvatarFallback className="bg-muted text-2xl font-bold text-muted-foreground">
+                {profile.displayName?.charAt(0) || "U"}
+              </AvatarFallback>
+            </Avatar>
+
+            <div className="space-y-1">
+              <h1 className="text-base font-semibold tracking-tight">{profile.displayName}</h1>
+              <p className="text-[11px] text-muted-foreground">Since {memberSince}</p>
             </div>
 
-            <div className="px-5 -mt-8 relative z-10">
-              <Avatar className="h-16 w-16 ring-4 ring-card">
-                <AvatarImage src={profile.photoURL || undefined} />
-                <AvatarFallback className="bg-primary/15 text-primary text-lg font-bold">
-                  {profile.displayName?.charAt(0) || "U"}
-                </AvatarFallback>
-              </Avatar>
+            {/* Stats — flat list, hairline separators */}
+            <div className="border-t border-border/60 pt-4 space-y-3">
+              {[
+                { val: stats.totalRatings, label: "Rated" },
+                { val: stats.averageRating ? stats.averageRating.toFixed(1) : "—", label: "Avg" },
+                { val: movieCount + tvCount, label: "Watched" },
+                { val: bookCount, label: "Read" },
+              ].map(({ val, label }) => (
+                <div key={label} className="flex items-baseline justify-between text-xs">
+                  <span className="text-muted-foreground">{label}</span>
+                  <span className="font-semibold tabular-nums">{val}</span>
+                </div>
+              ))}
             </div>
 
-            <div className="px-5 pt-2 pb-5 space-y-4">
-              <div>
-                <h1 className="text-lg font-bold tracking-tight">{profile.displayName}</h1>
-                <p className="text-[11px] text-muted-foreground">Since {memberSince}</p>
-              </div>
-
-              {/* Stats */}
-              <div className="grid grid-cols-2 gap-1.5">
-                {[
-                  { val: stats.totalRatings, label: "Rated" },
-                  { val: stats.averageRating ? stats.averageRating.toFixed(1) : "—", label: "Avg" },
-                  { val: movieCount + tvCount, label: "Watched" },
-                  { val: bookCount, label: "Read" },
-                ].map(({ val, label }) => (
-                  <div key={label} className="text-center py-2 rounded-lg bg-background">
-                    <div className="text-lg font-bold tabular-nums">{val}</div>
-                    <div className="text-[9px] text-muted-foreground uppercase tracking-wider">{label}</div>
+            {/* Favorites */}
+            <div className="border-t border-border/60 pt-4 space-y-2.5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70">Favorites</p>
+              <div className="grid grid-cols-3 gap-2">
+                {(['movie', 'tv', 'book'] as const).map((type) => (
+                  <div key={type}
+                    className={`relative aspect-[2/3] rounded-sm overflow-hidden bg-muted/60
+                      ${isOwnProfile ? 'cursor-pointer group hover:opacity-90 transition-opacity' : ''}`}
+                    onClick={() => isOwnProfile && setEditingMedia({ type, isOpen: true })}>
+                    {favoriteMedia?.[type]?.coverImage ? (
+                      <Image src={favoriteMedia[type]!.coverImage} alt={favoriteMedia[type]!.title} fill
+                        className="object-cover" sizes="80px" />
+                    ) : (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 text-muted-foreground">
+                        {type === 'movie' ? <Film className="h-3.5 w-3.5" /> : type === 'tv' ? <Tv className="h-3.5 w-3.5" /> : <BookOpen className="h-3.5 w-3.5" />}
+                        {isOwnProfile && <span className="text-[8px]">Add</span>}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
+            </div>
 
-              {/* Favorites */}
-              <div className="space-y-2">
-                <p className="text-[9px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">Favorites</p>
-                <div className="flex gap-1.5">
-                  {(['movie', 'tv', 'book'] as const).map((type) => (
-                    <div key={type}
-                      className={`relative flex-1 aspect-[2/3] rounded-lg overflow-hidden bg-muted ring-1 ring-border
-                        ${isOwnProfile ? 'cursor-pointer group hover:ring-primary/40 transition-all' : ''}`}
-                      onClick={() => isOwnProfile && setEditingMedia({ type, isOpen: true })}>
-                      {favoriteMedia?.[type]?.coverImage ? (
-                        <Image src={favoriteMedia[type]!.coverImage} alt={favoriteMedia[type]!.title} fill
-                          className="object-cover group-hover:scale-105 transition-transform duration-300" />
-                      ) : (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-0.5 text-muted-foreground">
-                          {type === 'movie' ? <Film className="h-3.5 w-3.5" /> : type === 'tv' ? <Tv className="h-3.5 w-3.5" /> : <BookOpen className="h-3.5 w-3.5" />}
-                          {isOwnProfile && <span className="text-[8px]">Add</span>}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+            {/* Media DNA — hairline divider button */}
+            {libraryEntries.length >= 5 ? (
+              <Link
+                href={`/profile/${profile.uid}/ai-report`}
+                prefetch={false}
+                className="group border-t border-border/60 pt-4 flex items-center justify-between"
+              >
+                <span className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-primary group-hover:text-foreground transition-colors">
+                  <Dna className="h-3 w-3" />Media DNA
+                </span>
+                <ChevronRight className="h-3 w-3 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
+              </Link>
+            ) : !isLoadingLibrary && libraryEntries.length > 0 && (
+              <div className="border-t border-border/60 pt-4 flex items-center gap-2 text-[10px] text-muted-foreground">
+                <Lock className="h-3 w-3 shrink-0" />Log {5 - libraryEntries.length} more for Media DNA
               </div>
+            )}
+          </aside>
 
-              {/* Media DNA */}
-              {libraryEntries.length >= 5 ? (
-                <Link
-                  href={`/profile/${profile.uid}/ai-report`}
-                  prefetch={false}
-                  className="flex items-center justify-between p-2.5 rounded-lg border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors group"
-                >
-                  <div className="flex items-center gap-2">
-                    <Dna className="h-3.5 w-3.5 text-primary" />
-                    <span className="text-xs font-medium">Media DNA</span>
-                  </div>
-                  <ChevronRight className="h-3 w-3 text-muted-foreground group-hover:translate-x-0.5 transition-transform" />
-                </Link>
-              ) : !isLoadingLibrary && libraryEntries.length > 0 && (
-                <div className="flex items-center gap-2 p-2.5 rounded-lg border border-border text-[11px] text-muted-foreground">
-                  <Lock className="h-3 w-3 shrink-0" />Log {5 - libraryEntries.length} more for Media DNA
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* ══ COL 2: Calendar + Collection ══ */}
-          <div className="space-y-4 min-w-0">
-            <div className="rounded-2xl border border-border bg-card p-5">
-              <MediaCalendar
-                libraryEntries={libraryEntries}
-                isLoadingLibrary={isLoadingLibrary}
-                selectedMediaType={selectedMediaType}
-                onMediaTypeChange={setSelectedMediaType}
-              />
-            </div>
-            <div className="rounded-2xl border border-border bg-card p-5">
+          {/* ══ COL 2: Calendar + Collection — no card chrome ══ */}
+          <main className="space-y-12 min-w-0">
+            <MediaCalendar
+              libraryEntries={libraryEntries}
+              isLoadingLibrary={isLoadingLibrary}
+              selectedMediaType={selectedMediaType}
+              onMediaTypeChange={setSelectedMediaType}
+            />
+            <div className="border-t border-border/60 pt-8">
               <MediaCollection
                 libraryEntries={libraryEntries}
                 watchlist={watchlist}
@@ -201,23 +186,23 @@ export default function ProfileView({ profile, isOwnProfile }: ProfileViewProps)
                 }}
               />
             </div>
-          </div>
+          </main>
 
-          {/* ══ COL 3: Recent Activity + Watchlist ══ */}
-          <div className="lg:sticky lg:top-20 space-y-4">
+          {/* ══ COL 3: Recent + Watchlist ══ */}
+          <aside className="lg:sticky lg:top-20 lg:self-start space-y-8">
             {/* Recent activity */}
-            <div className="rounded-2xl border border-border bg-card p-4">
-              <h2 className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground mb-3">Recent</h2>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70 mb-3">Recent</p>
               {isLoadingLibrary ? (
                 <div className="grid grid-cols-4 gap-1.5">
-                  {Array(8).fill(0).map((_, i) => <div key={i} className="aspect-[2/3] rounded shimmer" />)}
+                  {Array(8).fill(0).map((_, i) => <div key={i} className="aspect-[2/3] rounded-sm shimmer" />)}
                 </div>
               ) : recentEntries.length > 0 ? (
                 <div className="grid grid-cols-4 gap-1.5">
                   {recentEntries.map((entry) => (
-                    <div key={entry.id} className="group relative aspect-[2/3] rounded-md overflow-hidden bg-muted ring-1 ring-border/50">
+                    <div key={entry.id} className="group relative aspect-[2/3] rounded-sm overflow-hidden bg-muted/60">
                       {entry.coverImage && (
-                        <Image src={entry.coverImage} alt={entry.title} fill className="object-cover" sizes="70px" />
+                        <Image src={entry.coverImage} alt={entry.title} fill className="object-cover" sizes="60px" />
                       )}
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-colors flex items-end justify-center pb-1">
                         {entry.rating && (
@@ -230,25 +215,25 @@ export default function ProfileView({ profile, isOwnProfile }: ProfileViewProps)
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground text-center py-6">No activity yet</p>
+                <p className="text-xs text-muted-foreground py-6">No activity yet</p>
               )}
             </div>
 
             {/* Watchlist */}
-            <div className="rounded-2xl border border-border bg-card p-4">
-              <h2 className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground mb-3">
-                Watchlist {watchlist.length > 0 && <span className="text-foreground ml-1">{watchlist.length}</span>}
-              </h2>
+            <div className="border-t border-border/60 pt-6">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground/70 mb-3">
+                Watchlist {watchlist.length > 0 && <span className="text-foreground/80 ml-1 normal-case tracking-normal">{watchlist.length}</span>}
+              </p>
               {isLoadingWatchlist ? (
                 <div className="space-y-2">
-                  {Array(3).fill(0).map((_, i) => <div key={i} className="h-10 rounded shimmer" />)}
+                  {Array(3).fill(0).map((_, i) => <div key={i} className="h-10 rounded-sm shimmer" />)}
                 </div>
               ) : watchlist.length > 0 ? (
-                <div className="space-y-1">
+                <div className="space-y-2">
                   {watchlist.slice(0, 6).map((item) => (
                     <Link key={item.id} href={`/media/${item.type}-${item.id}`}
-                      className="flex items-center gap-2.5 p-1.5 rounded-md hover:bg-muted/50 transition-colors">
-                      <div className="relative w-7 h-10 rounded overflow-hidden bg-muted shrink-0 ring-1 ring-border/50">
+                      className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+                      <div className="relative w-7 h-10 rounded-sm overflow-hidden bg-muted/60 shrink-0">
                         {item.coverImage && <Image src={item.coverImage} alt={item.title} fill className="object-cover" sizes="28px" />}
                       </div>
                       <div className="min-w-0">
@@ -259,10 +244,10 @@ export default function ProfileView({ profile, isOwnProfile }: ProfileViewProps)
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground text-center py-6">Nothing here yet</p>
+                <p className="text-xs text-muted-foreground py-4">Nothing here yet</p>
               )}
             </div>
-          </div>
+          </aside>
         </div>
       </div>
 

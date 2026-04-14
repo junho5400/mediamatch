@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react"
 import { X, Trash2, Sparkles, SendHorizonal, Bot } from "lucide-react"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import { Textarea } from "@/components/ui/textarea"
 import { useAuth } from "@/lib/authContext"
 import { getUserMediaEntries } from "@/lib/firebase/firestore"
@@ -184,13 +186,19 @@ export default function ChatbotWindow({ onClose }: { onClose: () => void }) {
                   </div>
                 )}
                 <span
-                  className={`inline-block max-w-[78%] text-sm leading-relaxed whitespace-pre-wrap px-3.5 py-2 ${
+                  className={`inline-block max-w-[78%] text-sm leading-relaxed px-3.5 py-2 ${
                     isUser
-                      ? "bg-primary text-primary-foreground rounded-2xl rounded-br-md"
+                      ? "bg-primary text-primary-foreground rounded-2xl rounded-br-md whitespace-pre-wrap"
                       : "bg-muted text-foreground rounded-2xl rounded-bl-md"
                   }`}
                 >
-                  {msg.text}
+                  {isUser ? (
+                    msg.text
+                  ) : (
+                    <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-1.5 prose-ul:my-1.5 prose-ol:my-1.5 prose-li:my-0 prose-headings:my-2 prose-strong:text-foreground prose-a:text-primary">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+                    </div>
+                  )}
                 </span>
               </div>
             )

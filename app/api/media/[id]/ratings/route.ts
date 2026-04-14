@@ -8,10 +8,19 @@ export async function GET(
   try {
     const { id } = await params
 
-    // Query actual rating distribution from media document
-    const mediaDoc = await adminDb.collection('media').doc(id).get()
+    // Resolve the real doc id: media docs are stored with a `${type}-${id}` key.
+    // The URL passes only the bare id, so try each type prefix in turn.
+    const candidateIds = id.includes('-')
+      ? [id]
+      : [`movie-${id}`, `tv-${id}`, `book-${id}`]
 
-    if (mediaDoc.exists) {
+    let mediaDoc = null
+    for (const docId of candidateIds) {
+      const snap = await adminDb.collection('media').doc(docId).get()
+      if (snap.exists) { mediaDoc = snap; break }
+    }
+
+    if (mediaDoc) {
       const data = mediaDoc.data()
       const stats = data?.stats
       if (stats?.ratingDistribution) {

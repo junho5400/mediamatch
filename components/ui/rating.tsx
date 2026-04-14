@@ -9,9 +9,11 @@ interface RatingProps {
   onChange: (value: number) => void
   className?: string
   readOnly?: boolean
+  size?: "sm" | "md"
 }
 
-export function Rating({ value, onChange, className, readOnly = false }: RatingProps) {
+export function Rating({ value, onChange, className, readOnly = false, size = "md" }: RatingProps) {
+  const starSize = size === "sm" ? "h-4 w-4" : "h-10 w-10"
   const [hoverValue, setHoverValue] = useState<number | null>(null)
   const [hoverPosition, setHoverPosition] = useState<number | null>(null)
 
@@ -58,7 +60,7 @@ export function Rating({ value, onChange, className, readOnly = false }: RatingP
           {/* Background star (always gray) */}
           <Star
             className={cn(
-              "h-10 w-10",
+              starSize,
               readOnly ? "text-muted-foreground" : "text-muted-foreground/50"
             )}
           />
@@ -67,7 +69,7 @@ export function Rating({ value, onChange, className, readOnly = false }: RatingP
           <div className="absolute inset-0">
             <Star
               className={cn(
-                "h-10 w-10 transition-transform",
+                starSize, "transition-transform",
                 (hoverValue !== null ? 
                   (index <= hoverValue && (index < hoverValue || hoverPosition! >= 0.3)) : 
                   index < Math.floor(displayValue)
@@ -85,7 +87,7 @@ export function Rating({ value, onChange, className, readOnly = false }: RatingP
             ) ? 'block' : 'none'
           }}>
             <Star
-              className="h-10 w-10 fill-yellow-400 text-yellow-400"
+              className={cn(starSize, "fill-yellow-400 text-yellow-400")}
             />
           </div>
         </button>

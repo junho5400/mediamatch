@@ -25,6 +25,7 @@ interface SearchOverlayProps {
 export default function SearchOverlay({ open, onClose }: SearchOverlayProps) {
   const [query, setQuery] = useState("")
   const [selectedType, setSelectedType] = useState<MediaType | "user">("movie")
+  const [semanticMode, setSemanticMode] = useState(false)
   const [isSearching, setIsSearching] = useState(false)
   const [mediaResults, setMediaResults] = useState<MediaItem[]>([])
   const [userResults, setUserResults] = useState<UserProfile[]>([])
@@ -64,7 +65,7 @@ export default function SearchOverlay({ open, onClose }: SearchOverlayProps) {
         setUserResults(allUsers.filter(u => u.displayName?.toLowerCase().includes(q.toLowerCase())))
         setMediaResults([])
       } else {
-        const res = await fetch(`/api/media/search?q=${encodeURIComponent(q)}&type=${selectedType}`)
+        const res = await fetch(`/api/media/search?q=${encodeURIComponent(q)}&type=${selectedType}&mode=${semanticMode ? "semantic" : "keyword"}`)
         setUserResults([])
         if (res.ok) setMediaResults(await res.json())
       }
@@ -75,6 +76,12 @@ export default function SearchOverlay({ open, onClose }: SearchOverlayProps) {
     setQuery(val)
     performSearch(val)
   }
+
+  // Re-run search when semantic toggle flips (if there's an active query)
+  useEffect(() => {
+    if (query.length >= 2) performSearch(query)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [semanticMode])
 
   const select = (path: string) => {
     onClose()
@@ -130,6 +137,7 @@ export default function SearchOverlay({ open, onClose }: SearchOverlayProps) {
             </div>
           </div>
 
+
           {/* Results */}
           {query.length >= 2 && (mediaResults.length > 0 || userResults.length > 0 || !isSearching) && (
             <div className="max-h-[50vh] overflow-y-auto border-t border-border">
@@ -180,14 +188,32 @@ export default function SearchOverlay({ open, onClose }: SearchOverlayProps) {
             </div>
           )}
 
-          {/* Keyboard hint */}
-          {query.length < 2 && (
-            <div className="p-3 pt-0 text-center">
+          {/* Footer: ESC hint (left) + semantic toggle (right) */}
+          <div className="flex items-center justify-between px-4 pb-3 pt-1 min-h-[28px]">
+            {query.length < 2 ? (
               <p className="text-[11px] text-muted-foreground/50">
                 Press <kbd className="px-1.5 py-0.5 rounded border border-border text-[10px]">ESC</kbd> to close
               </p>
-            </div>
-          )}
+            ) : <span />}
+            {selectedType !== "user" && (
+              <div className="flex items-center gap-2">
+                <span className={`text-[11px] ${semanticMode ? "text-foreground" : "text-muted-foreground"}`}>Semantic</span>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={semanticMode}
+                  onClick={() => setSemanticMode(s => !s)}
+                  className={`relative inline-flex h-[18px] w-8 shrink-0 cursor-pointer rounded-full border-transparent transition-colors
+                    ${semanticMode ? "bg-primary" : "bg-input"}`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-[14px] w-[14px] translate-y-[2px] rounded-full bg-background shadow ring-0 transition-transform
+                      ${semanticMode ? "translate-x-[16px]" : "translate-x-[2px]"}`}
+                  />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </>

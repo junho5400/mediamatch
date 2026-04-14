@@ -8,9 +8,29 @@ import { Button } from "@/components/ui/button"
 import { RefreshCw, ChevronLeft, ChevronRight } from "lucide-react"
 import { MediaItem } from "@/types/database"
 
-// Client-side cache that survives component unmount/remount (but not full page reload)
+// Client-side cache. In-memory Map for instant cross-component access,
+// localStorage for survival across full page reloads.
 const clientCache = new Map<string, { items: MediaItem[], timestamp: number }>()
 const CLIENT_CACHE_TTL = 60 * 60 * 1000  // 1 hour
+const LS_KEY_PREFIX = "mm:recs:"
+
+function readPersistentCache(key: string): { items: MediaItem[], timestamp: number } | null {
+  if (typeof window === "undefined") return null
+  try {
+    const raw = window.localStorage.getItem(LS_KEY_PREFIX + key)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { items: MediaItem[], timestamp: number }
+    if (Date.now() - parsed.timestamp > CLIENT_CACHE_TTL) return null
+    return parsed
+  } catch { return null }
+}
+
+function writePersistentCache(key: string, value: { items: MediaItem[], timestamp: number }) {
+  if (typeof window === "undefined") return
+  try {
+    window.localStorage.setItem(LS_KEY_PREFIX + key, JSON.stringify(value))
+  } catch { /* quota or disabled */ }
+}
 
 interface RecommendationSectionProps {
   title: string
@@ -30,9 +50,17 @@ export default function RecommendationSection({ title, description, type, onLoad
   const fetchRecommendations = async (refresh = false) => {
     if (!user) return
 
-    // Check client cache (unless refreshing)
+    // Check client cache (in-memory, then localStorage) unless refreshing
     if (!refresh) {
-      const cached = clientCache.get(`${user.uid}:${type}`)
+      const key = `${user.uid}:${type}`
+      let cached = clientCache.get(key)
+      if (!cached) {
+        const persisted = readPersistentCache(key)
+        if (persisted) {
+          cached = persisted
+          clientCache.set(key, persisted)
+        }
+      }
       if (cached && Date.now() - cached.timestamp < CLIENT_CACHE_TTL) {
         setRecommendations(cached.items)
         setIsLoading(false)
@@ -52,8 +80,10 @@ export default function RecommendationSection({ title, description, type, onLoad
       setRecommendations(data)
       hasFetchedRef.current[type] = true
       onLoad?.(data)
-      // Save to client cache
-      clientCache.set(`${user.uid}:${type}`, { items: data, timestamp: Date.now() })
+      // Save to both in-memory and persistent caches
+      const entry = { items: data, timestamp: Date.now() }
+      clientCache.set(`${user.uid}:${type}`, entry)
+      writePersistentCache(`${user.uid}:${type}`, entry)
     } catch { setError(true) }
     finally { setIsLoading(false) }
   }

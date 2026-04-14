@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { PlusCircle, User, LogOut, Sun, Moon, Search } from "lucide-react"
@@ -11,6 +11,7 @@ import { useAuth } from "@/lib/authContext"
 import { signOut } from "@/lib/firebase/firebase"
 import { useTheme } from "next-themes"
 import SearchOverlay from "@/components/search-overlay"
+import LogMediaDialog from "@/components/log-media-dialog"
 
 export default function Navigation() {
   const pathname = usePathname()
@@ -18,6 +19,24 @@ export default function Navigation() {
   const { user, loading } = useAuth()
   const { theme, setTheme } = useTheme()
   const [searchOpen, setSearchOpen] = useState(false)
+  const [logOpen, setLogOpen] = useState(false)
+
+  // Global keyboard shortcut: Cmd/Ctrl+K or "/" opens the search overlay
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null
+      const inField = target?.tagName === "INPUT" || target?.tagName === "TEXTAREA" || target?.isContentEditable
+      if ((e.key === "k" || e.key === "K") && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault()
+        setSearchOpen(true)
+      } else if (e.key === "/" && !inField) {
+        e.preventDefault()
+        setSearchOpen(true)
+      }
+    }
+    window.addEventListener("keydown", handler)
+    return () => window.removeEventListener("keydown", handler)
+  }, [])
 
   if (pathname === "/login") return null
 
@@ -33,18 +52,21 @@ export default function Navigation() {
                 className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground h-8 px-4 rounded-full bg-muted/50 border border-border/50 w-full max-w-[280px] transition-colors">
                 <Search className="h-3.5 w-3.5 shrink-0" />
                 <span className="text-[13px]">Search...</span>
-                <kbd className="ml-auto text-[10px] text-muted-foreground/40 hidden sm:inline">/</kbd>
+                <kbd className="ml-auto text-[10px] text-muted-foreground/40 hidden sm:inline">⌘K</kbd>
               </button>
             </div>
           )}
 
           {loading ? <div className="h-7 w-7 rounded-full shimmer" /> : user ? (
             <div className="flex items-center gap-0.5 shrink-0">
-              <Link href="/add">
-                <Button variant="ghost" size="sm" className="h-8 px-3 text-xs text-muted-foreground hover:text-foreground">
-                  <PlusCircle className="h-3.5 w-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Log</span>
-                </Button>
-              </Link>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-3 text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => setLogOpen(true)}
+              >
+                <PlusCircle className="h-3.5 w-3.5 sm:mr-1.5" /><span className="hidden sm:inline">Log</span>
+              </Button>
               <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground"
                 onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
                 <Sun className="h-3.5 w-3.5 rotate-0 scale-100 transition-transform dark:-rotate-90 dark:scale-0" />
@@ -75,6 +97,7 @@ export default function Navigation() {
         </div>
       </header>
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} />
+      <LogMediaDialog open={logOpen} onOpenChange={setLogOpen} />
     </>
   )
 }

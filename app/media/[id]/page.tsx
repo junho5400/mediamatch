@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from "next/image"
 import { Film, BookOpen, Tv, ListPlus, ListX, PlusCircle, Star, ArrowLeft, Clock } from "lucide-react"
+import LogMediaDialog from "@/components/log-media-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/components/ui/use-toast"
@@ -24,6 +25,7 @@ export default function MediaDetailPage() {
   const [userRating, setUserRating] = useState(0)
   const [inWatchlist, setInWatchlist] = useState(false)
   const [userEntry, setUserEntry] = useState<MediaEntry | null>(null)
+  const [logOpen, setLogOpen] = useState(false)
 
   useEffect(() => {
     const fetchMedia = async () => {
@@ -139,6 +141,12 @@ export default function MediaDetailPage() {
                   <span className="text-lg font-bold">{media.stats.averageRating.toFixed(1)}</span>
                   <span className="text-xs text-muted-foreground">/5 · {media.stats.totalRatings}</span>
                 </div>
+              ) : userEntry && userRating > 0 ? (
+                <div className="flex items-center gap-1.5">
+                  <Star className="h-4 w-4 text-amber-400 fill-amber-400" />
+                  <span className="text-lg font-bold">{userRating.toFixed(1)}</span>
+                  <span className="text-xs text-muted-foreground">/5 · your rating</span>
+                </div>
               ) : (
                 <span className="text-xs text-muted-foreground">No ratings yet</span>
               )}
@@ -149,27 +157,29 @@ export default function MediaDetailPage() {
               )}
             </div>
 
+            {/* Description */}
+            {media.description && (
+              <div>
+                <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Synopsis</h2>
+                <p className="text-sm leading-relaxed text-foreground/80">{media.description}</p>
+              </div>
+            )}
+
             {/* User log (if logged) */}
             {userEntry && (
               <div className="border border-border rounded-lg p-4 space-y-2">
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-muted-foreground">Your rating</span>
-                  <Rating value={userRating} onChange={() => {}} readOnly={true} />
-                  {userEntry.tag && <Badge variant="secondary" className="text-[10px]">{userEntry.tag}</Badge>}
+                <div className="flex items-center gap-2 flex-nowrap whitespace-nowrap overflow-x-auto">
+                  <span className="text-xs text-muted-foreground shrink-0">Your rating</span>
+                  <Rating value={userRating} onChange={() => {}} readOnly={true} size="sm" />
+                  {userEntry.tag && userEntry.tag.split(',').map(t => t.trim()).filter(Boolean).map(tag => (
+                    <Badge key={tag} variant="secondary" className="text-[10px] shrink-0">{tag}</Badge>
+                  ))}
                 </div>
                 {userEntry.review && <p className="text-sm text-muted-foreground italic leading-relaxed">&quot;{userEntry.review}&quot;</p>}
                 <p className="text-[10px] text-muted-foreground/60 flex items-center gap-1">
                   <Clock className="h-2.5 w-2.5" />
                   {format(userEntry.watchedAt instanceof Date ? userEntry.watchedAt : userEntry.watchedAt.toDate(), 'MMMM d, yyyy')}
                 </p>
-              </div>
-            )}
-
-            {/* Description */}
-            {media.description && (
-              <div>
-                <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Synopsis</h2>
-                <p className="text-sm leading-relaxed text-foreground/80">{media.description}</p>
               </div>
             )}
 
@@ -187,18 +197,16 @@ export default function MediaDetailPage() {
           </div>
 
           {/* ── Col 3: Actions + Details card ── */}
-          <div className="hidden lg:flex flex-col justify-end h-full space-y-3">
-            {/* Actions — horizontal, above the card */}
-            {!userEntry && (
-              <div className="flex gap-2">
-                <Button onClick={() => router.push(`/add?mediaId=${media.id}`)} size="sm" className="flex-1">
-                  <PlusCircle className="mr-1.5 h-3.5 w-3.5" />Log
-                </Button>
-                <Button variant="secondary" size="sm" onClick={toggleWatchlist} className="flex-1 bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] border-0">
-                  {inWatchlist ? <><ListX className="mr-1.5 h-3.5 w-3.5" />Watchlist</> : <><ListPlus className="mr-1.5 h-3.5 w-3.5" />Watchlist</>}
-                </Button>
-              </div>
-            )}
+          <div className="hidden lg:flex flex-col space-y-3 pt-32">
+            {/* Actions — horizontal, above the card (always rendered to keep layout stable) */}
+            <div className="flex gap-2">
+              <Button onClick={() => setLogOpen(true)} size="sm" className="flex-1">
+                <PlusCircle className="mr-1.5 h-3.5 w-3.5" />{userEntry ? 'Edit' : 'Log'}
+              </Button>
+              <Button variant="secondary" size="sm" onClick={toggleWatchlist} className="flex-1 bg-black/[0.04] dark:bg-white/[0.06] hover:bg-black/[0.08] dark:hover:bg-white/[0.1] border-0">
+                {inWatchlist ? <><ListX className="mr-1.5 h-3.5 w-3.5" />Watchlist</> : <><ListPlus className="mr-1.5 h-3.5 w-3.5" />Watchlist</>}
+              </Button>
+            </div>
 
             {/* Details card — glassmorphic, bottom-aligned with poster */}
             <div className="rounded-xl p-4 space-y-2.5 bg-black/[0.03] dark:bg-white/[0.04] border border-black/[0.06] dark:border-white/[0.06]">
@@ -223,7 +231,7 @@ export default function MediaDetailPage() {
           {/* Mobile-only actions */}
           {!userEntry && (
             <div className="flex gap-2 lg:hidden mt-4">
-              <Button onClick={() => router.push(`/add?mediaId=${media.id}`)} size="sm">
+              <Button onClick={() => setLogOpen(true)} size="sm">
                 <PlusCircle className="mr-1.5 h-3.5 w-3.5" />Log
               </Button>
               <Button variant="secondary" size="sm" onClick={toggleWatchlist}>
@@ -233,6 +241,7 @@ export default function MediaDetailPage() {
           )}
         </div>
       </div>
+      <LogMediaDialog open={logOpen} onOpenChange={setLogOpen} prefilledMediaId={media.id} />
     </div>
   )
 }

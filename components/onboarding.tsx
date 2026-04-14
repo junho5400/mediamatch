@@ -1,67 +1,197 @@
 "use client"
 
-import Link from "next/link"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import Image from "next/image"
+import { Loader2, ArrowRight, Star } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { BookOpen, Sparkles, BarChart2, MessageSquare, PlusCircle } from "lucide-react"
+import { useAuth } from "@/lib/authContext"
+import { addMediaEntry } from "@/lib/firebase/firestore"
+import { MediaItem } from "@/types/database"
 
 interface OnboardingProps {
   displayName?: string | null
 }
 
+// Curated TMDB IDs — broad-taste sampler used to seed the cold-start signal.
+const SEED_IDS = [
+  "496243", "680", "27205", "155", "13",
+  "857", "129", "122", "238", "550",
+  "603", "475557", "19404", "372058", "637",
+  "389", "769", "274", "424", "105",
+]
+
+const MIN_PICKS = 5
+
+function StarRow({
+  value,
+  onChange,
+}: { value: number; onChange: (v: number) => void }) {
+  return (
+    <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+      {[1, 2, 3, 4, 5].map(n => {
+        const filled = value >= n
+        return (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onChange(value === n ? 0 : n)}
+            className="p-0.5 hover:scale-110 transition-transform"
+            aria-label={`Rate ${n} stars`}
+          >
+            <Star
+              className={`h-3.5 w-3.5 ${filled ? "fill-amber-400 text-amber-400" : "text-white/40"}`}
+              strokeWidth={2}
+            />
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function Onboarding({ displayName }: OnboardingProps) {
   const firstName = displayName?.split(" ")[0] || "there"
+  const router = useRouter()
+  const { user } = useAuth()
+  const [items, setItems] = useState<MediaItem[]>([])
+  const [ratings, setRatings] = useState<Record<string, number>>({})
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    Promise.all(
+      SEED_IDS.map(id =>
+        fetch(`/api/media/${id}`).then(r => (r.ok ? r.json() : null)).catch(() => null)
+      )
+    ).then(results => {
+      if (cancelled) return
+      const valid = results.filter((r): r is MediaItem => !!r && !!r.coverImage)
+      setItems(valid)
+    })
+    return () => { cancelled = true }
+  }, [])
+
+  const setRating = (id: string, value: number) => {
+    setRatings(prev => {
+      const next = { ...prev }
+      if (value === 0) delete next[id]
+      else next[id] = value
+      return next
+    })
+  }
+
+  const ratedCount = Object.keys(ratings).length
+  const enough = ratedCount >= MIN_PICKS
+
+  const submit = async () => {
+    if (!user || !enough || submitting) return
+    setSubmitting(true)
+    try {
+      await Promise.all(
+        items
+          .filter(it => ratings[it.id])
+          .map(it =>
+            addMediaEntry(user.uid, it.type, it.id, {
+              mediaId: it.id,
+              type: it.type,
+              rating: ratings[it.id],
+              tag: ratings[it.id] >= 4 ? "loved" : ratings[it.id] >= 3 ? "liked" : "meh",
+              review: "",
+              watchedAt: new Date(),
+            })
+          )
+      )
+      router.refresh()
+    } catch {
+      setSubmitting(false)
+    }
+  }
 
   return (
-    <div className="container py-16 max-w-2xl mx-auto flex flex-col items-center gap-8">
-      {/* Welcome header */}
-      <div className="text-center space-y-3">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 mb-2">
-          <BookOpen className="h-8 w-8 text-white" />
+    <div className="min-h-[calc(100vh-3rem)] flex flex-col">
+      {/* ── Header ── */}
+      <div className="max-w-[1100px] mx-auto w-full px-4 sm:px-6 lg:px-8 pt-12 pb-6">
+        <div className="flex items-end justify-between gap-6 flex-wrap">
+          <div className="space-y-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Step 1 of 1 · Cold start</p>
+            <h1 className="text-3xl sm:text-4xl font-bold tracking-tight leading-tight">
+              Welcome, {firstName}. Rate a few you&apos;ve seen.
+            </h1>
+            <p className="text-sm text-muted-foreground max-w-xl">
+              Star at least {MIN_PICKS}. Low ratings push your taste vector <em>away</em> from those embeddings, high ratings pull it closer — that&apos;s how the engine learns what you don&apos;t want.
+            </p>
+          </div>
+          <div className="text-right shrink-0">
+            <p className="text-3xl font-bold tabular-nums">{ratedCount}<span className="text-muted-foreground/60 text-base">/{MIN_PICKS}</span></p>
+            <p className="text-[10px] uppercase tracking-wider text-muted-foreground">rated</p>
+          </div>
         </div>
-        <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-transparent bg-clip-text">
-          Welcome, {firstName}!
-        </h1>
-        <p className="text-muted-foreground text-base max-w-md mx-auto">
-          MediaMatch is your personal library for books, movies, and TV shows — powered by AI to help you discover what to watch or read next.
-        </p>
+
+        {/* progress bar */}
+        <div className="mt-5 h-1 w-full rounded-full bg-muted overflow-hidden">
+          <div
+            className="h-full bg-primary transition-all duration-300"
+            style={{ width: `${Math.min(100, (ratedCount / MIN_PICKS) * 100)}%` }}
+          />
+        </div>
       </div>
 
-      {/* CTA */}
-      <Button asChild size="lg" className="bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 text-white shadow-md px-8 py-6 text-base rounded-full">
-        <Link href="/add">
-          <PlusCircle className="mr-2 h-5 w-5" />
-          Log your first item
-        </Link>
-      </Button>
+      {/* ── Grid ── */}
+      <div className="flex-1 max-w-[1100px] mx-auto w-full px-4 sm:px-6 lg:px-8 pb-32">
+        {items.length === 0 ? (
+          <div className="h-[40vh] flex items-center justify-center">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+            {items.map(item => {
+              const value = ratings[item.id] || 0
+              const active = value > 0
+              return (
+                <div
+                  key={item.id}
+                  className={`group relative aspect-[2/3] rounded-lg overflow-hidden transition-all
+                    ${active
+                      ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                      : "ring-1 ring-border/60"}`}
+                >
+                  {item.coverImage && (
+                    <Image src={item.coverImage} alt={item.title} fill className="object-cover" sizes="(max-width: 768px) 50vw, 20vw" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/40 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-2.5 text-left space-y-1.5">
+                    <div>
+                      <p className="text-[11px] font-semibold text-white leading-tight line-clamp-1">{item.title}</p>
+                      {item.year && <p className="text-[10px] text-white/50">{item.year}</p>}
+                    </div>
+                    <StarRow value={value} onChange={(v) => setRating(item.id, v)} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
 
-      {/* AI features unlock card */}
-      <Card className="w-full border border-border/50 shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-purple-500" />
-            AI features unlock as you log media
-          </CardTitle>
-          <CardDescription>Add at least one item to your library to get started.</CardDescription>
-        </CardHeader>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-          <div className="flex flex-col items-center text-center gap-2 p-3 rounded-lg bg-muted/40">
-            <Sparkles className="h-6 w-6 text-indigo-500" />
-            <p className="text-sm font-medium">AI Recommendations</p>
-            <p className="text-xs text-muted-foreground">Personalized picks based on your taste</p>
-          </div>
-          <div className="flex flex-col items-center text-center gap-2 p-3 rounded-lg bg-muted/40">
-            <BarChart2 className="h-6 w-6 text-purple-500" />
-            <p className="text-sm font-medium">Taste Report</p>
-            <p className="text-xs text-muted-foreground">A deep-dive analysis of your media habits</p>
-          </div>
-          <div className="flex flex-col items-center text-center gap-2 p-3 rounded-lg bg-muted/40">
-            <MessageSquare className="h-6 w-6 text-pink-500" />
-            <p className="text-sm font-medium">AI Chatbot</p>
-            <p className="text-xs text-muted-foreground">Ask for recommendations and get instant answers</p>
-          </div>
-        </CardContent>
-      </Card>
+      {/* ── Sticky CTA bar ── */}
+      <div className="fixed bottom-0 left-0 right-0 border-t border-border/60 bg-background/85 backdrop-blur-xl">
+        <div className="max-w-[1100px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
+          <p className="text-xs text-muted-foreground">
+            {enough
+              ? "Looking good. Ready to seed your taste vector."
+              : `Rate ${MIN_PICKS - ratedCount} more to continue.`}
+          </p>
+          <Button
+            onClick={submit}
+            disabled={!enough || submitting}
+            size="default"
+            className="rounded-full px-5"
+          >
+            {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <>Continue<ArrowRight className="ml-1.5 h-3.5 w-3.5" /></>}
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }
