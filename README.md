@@ -9,8 +9,9 @@ The goal of this project is to demonstrate end-to-end ML engineering: embedding 
 - **Log media** across books, movies, and TV from a unified catalog (TMDB + Google Books).
 - **Rate, tag, and review** items. Reviews feed back into the embeddings — an item's vector gradually shifts from its catalog description toward how real users describe it.
 - **Get recommendations** from a smart router that picks between content-based, collaborative, and hybrid scoring depending on what signal is available for each candidate.
+- **Search the catalog** by keyword (TMDB / Google Books) or by meaning (sentence-transformer embeddings over Qdrant). The mode is a per-query toggle.
 - **Browse a profile** with a taste summary, AI-generated report, and library breakdown.
-- **Chat with an assistant** that knows your library and can recommend or compare titles conversationally.
+- **Chat with an assistant** that uses the recommendation API as its source of truth. Gemini handles phrasing only — it does not rank.
 
 ## Architecture
 
@@ -32,6 +33,7 @@ The goal of this project is to demonstrate end-to-end ML engineering: embedding 
 - **ML service** — FastAPI, Python 3.13. Serves recommendations, semantic search, and on-the-fly embedding of new items.
 - **Vector DB** — Qdrant running locally in Docker. Stores item embeddings with metadata for fast similarity search.
 - **Gemini** — used only for presentation: chatbot replies and natural-language AI reports. It is **not** the recommendation engine.
+- **Caching** — recommendations are cached per user in-process for 1 hour and persisted client-side in localStorage, so the For You rail renders without a network round-trip on reload. Media metadata is cached in Firestore to avoid repeat TMDB / Google Books calls.
 
 ## The recommendation stack
 
@@ -52,6 +54,10 @@ Pure LLM recommendations drift, hallucinate titles, and can't leverage collabora
 ### Review-aware embeddings
 
 When a user writes a review, the item's vector is updated as a weighted blend of its current embedding and the review text embedding. After ~10 reviews, the item's position in vector space has shifted meaningfully from "what the catalog says it is" to "how people actually experience it." This closes the feedback loop between user signal and the content model.
+
+### Cold start
+
+New users see an onboarding flow that asks them to rate a curated set of titles before reaching the home feed. Each rating is written as a normal library entry, which produces an immediate taste vector for the content-based path and a non-empty rating row for the collaborative path. By the time the home feed loads, the smart router already has signal to work with.
 
 ## Tech stack
 
@@ -138,9 +144,9 @@ python data/merge_catalog.py     # builds the unified media catalog
 Then embed and index:
 
 ```bash
-python -m embeddings.build_index
-python -m models.train_svd
-python -m models.train_hybrid
+python -m embeddings.generate           # embed catalog and upload to Qdrant
+python -m models.matrix_factorization   # train SVD
+python -m models.hybrid                 # train the hybrid ranker
 ```
 
 ### Environment variables
