@@ -80,10 +80,13 @@ export default function RecommendationSection({ title, description, type, onLoad
       setRecommendations(data)
       hasFetchedRef.current[type] = true
       onLoad?.(data)
-      // Save to both in-memory and persistent caches
-      const entry = { items: data, timestamp: Date.now() }
-      clientCache.set(`${user.uid}:${type}`, entry)
-      writePersistentCache(`${user.uid}:${type}`, entry)
+      // Only cache non-empty results — empty arrays usually mean a
+      // transient backend failure, not a real "no recs" state.
+      if (Array.isArray(data) && data.length > 0) {
+        const entry = { items: data, timestamp: Date.now() }
+        clientCache.set(`${user.uid}:${type}`, entry)
+        writePersistentCache(`${user.uid}:${type}`, entry)
+      }
     } catch { setError(true) }
     finally { setIsLoading(false) }
   }
