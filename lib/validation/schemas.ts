@@ -28,6 +28,11 @@ export const WatchlistRequestSchema = z.object({
   add: z.boolean(),
 })
 
+export const EmbedReviewRequestSchema = z.object({
+  review_text: z.string().min(1).max(5000),
+  media_type: MediaTypeSchema,
+})
+
 export const MediaSearchQuerySchema = z.object({
   q: z.string().min(1).max(200),
   type: MediaTypeSchema.optional(),

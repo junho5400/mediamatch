@@ -147,6 +147,27 @@ export default function AddMediaForm({ prefilledMediaId, onSuccess }: AddMediaFo
         coverImage: selectedMedia.coverImage,
       })
 
+      const review = values.notes?.trim() ?? ""
+      if (review.length > 20) {
+        const user = auth.currentUser
+        if (user) {
+          user.getIdToken()
+            .then((token) =>
+              fetch(`/api/media/${selectedMedia.id}/embed-review`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({ review_text: review, media_type: selectedMedia.type }),
+              })
+            )
+            .catch(() => {
+              // Fire-and-forget: embedding updates are best-effort
+            })
+        }
+      }
+
       toast({
         title: "Success",
         description: "Media added to your library",
