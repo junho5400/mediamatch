@@ -14,6 +14,7 @@ Usage:
 
 import argparse
 import os
+import threading
 
 import numpy as np
 import pandas as pd
@@ -442,13 +443,18 @@ class RecommendationRouter:
 
 # Module-level instance
 _router: RecommendationRouter | None = None
+_router_lock = threading.Lock()
 
 
 def get_router() -> RecommendationRouter:
     global _router
-    if _router is None:
-        _router = RecommendationRouter()
-        _router.load()
+    if _router is not None:
+        return _router
+    with _router_lock:
+        if _router is None:
+            instance = RecommendationRouter()
+            instance.load()
+            _router = instance
     return _router
 
 
