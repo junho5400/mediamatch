@@ -48,7 +48,7 @@ export default function HomeFeed() {
   }, [hero])
 
   if (loading) return <div className="h-[60vh] flex items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>
-  if (isNewUser) return <Onboarding displayName={user?.displayName} />
+  if (isNewUser) return <Onboarding displayName={user?.displayName} onComplete={() => setIsNewUser(false)} />
 
   return (
     <div className="min-h-screen">

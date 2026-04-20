@@ -16,7 +16,7 @@ export function middleware(request: NextRequest) {
       "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: https://image.tmdb.org https://books.google.com https://lh3.googleusercontent.com https://*.firebasestorage.app blob:",
+      "img-src 'self' data: https://image.tmdb.org https://books.google.com http://books.google.com https://covers.openlibrary.org https://lh3.googleusercontent.com https://*.firebasestorage.app blob:",
       "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://*.firebaseapp.com wss://*.firebaseio.com https://api.themoviedb.org https://generativelanguage.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com",
       "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com",
     ].join('; ')

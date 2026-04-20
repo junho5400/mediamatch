@@ -11,14 +11,56 @@ import { MediaItem } from "@/types/database"
 
 interface OnboardingProps {
   displayName?: string | null
+  onComplete?: () => void
 }
 
-// Curated TMDB IDs — broad-taste sampler used to seed the cold-start signal.
+// Curated, type-prefixed IDs — broad-taste sampler used to seed the
+// cold-start signal. Span movies / TV / books across eras, genres,
+// countries so the taste vector starts with real diversity.
 const SEED_IDS = [
-  "496243", "680", "27205", "155", "13",
-  "857", "129", "122", "238", "550",
-  "603", "475557", "19404", "372058", "637",
-  "389", "769", "274", "424", "105",
+  // Movies (20)
+  "movie-550",    // Fight Club
+  "movie-27205",  // Inception
+  "movie-680",    // Pulp Fiction
+  "movie-13",     // Forrest Gump
+  "movie-862",    // Toy Story
+  "movie-129",    // Spirited Away
+  "movie-19404",  // Dilwale Dulhania Le Jayenge
+  "movie-475557", // Joker
+  "movie-155",    // The Dark Knight
+  "movie-238",    // The Godfather
+  "movie-496243", // Parasite
+  "movie-769",    // Goodfellas
+  "movie-120",    // LOTR: Fellowship
+  "movie-424",    // Schindler's List
+  "movie-11",     // Star Wars
+  "movie-372058", // Your Name
+  "movie-637",    // Life Is Beautiful
+  "movie-8587",   // The Lion King
+  "movie-324857", // Spider-Verse
+  "movie-389",    // 12 Angry Men
+  // TV (12)
+  "tv-1396",      // Breaking Bad
+  "tv-1399",      // Game of Thrones
+  "tv-66732",     // Stranger Things
+  "tv-60574",     // Peaky Blinders
+  "tv-94605",     // Arcane
+  "tv-1668",      // Friends
+  "tv-2316",      // The Office (US)
+  "tv-46648",     // True Detective
+  "tv-87108",     // Chernobyl
+  "tv-93405",     // Squid Game
+  "tv-76479",     // The Boys
+  "tv-82856",     // The Mandalorian
+  // Books (8)
+  "book-iXn5U2IzVH0C", // The Great Gatsby
+  "book-6u2QEAAAQBAJ", // 1984
+  "book-ayJpGQeyxgkC", // To Kill a Mockingbird
+  "book-OlCHcjX0RT4C", // The Hobbit
+  "book-B1hSG45JCX4C", // Dune
+  "book-hACTuAAACAAJ", // Harry Potter and the Sorcerer's Stone
+  "book-3UQLvgAACAAJ", // Pride and Prejudice
+  "book-zfuOEAAAQBAJ", // Sapiens
 ]
 
 const MIN_PICKS = 5
@@ -50,7 +92,7 @@ function StarRow({
   )
 }
 
-export default function Onboarding({ displayName }: OnboardingProps) {
+export default function Onboarding({ displayName, onComplete }: OnboardingProps) {
   const firstName = displayName?.split(" ")[0] || "there"
   const router = useRouter()
   const { user } = useAuth()
@@ -95,15 +137,19 @@ export default function Onboarding({ displayName }: OnboardingProps) {
             addMediaEntry(user.uid, it.type, it.id, {
               mediaId: it.id,
               type: it.type,
+              title: it.title,
+              coverImage: it.coverImage,
               rating: ratings[it.id],
-              tag: ratings[it.id] >= 4 ? "loved" : ratings[it.id] >= 3 ? "liked" : "meh",
               review: "",
               watchedAt: new Date(),
             })
           )
       )
       router.refresh()
+      onComplete?.()
     } catch {
+      // fall through
+    } finally {
       setSubmitting(false)
     }
   }
