@@ -1,6 +1,6 @@
 // lib/recommendations/getRecommendations.ts
 
-import { getUserMediaEntries } from "@/lib/firebase/firestore"
+import { getUserMediaEntriesAdmin } from "@/lib/firebase/firestore-admin"
 import { getMediaBatchWithCache } from "@/lib/services/mediaCache"
 import { MediaItem } from "@/types/database"
 
@@ -37,7 +37,7 @@ interface MLResponse {
  * with full metadata via Firestore-cached lookups (TMDB/Google Books).
  */
 export async function getRecommendations(type: RecommendationType, userId: string): Promise<MediaItem[]> {
-  const logs = await getUserMediaEntries(userId)
+  const logs = await getUserMediaEntriesAdmin(userId)
   const intent = type === "popular" ? "popular" : "for_you"
 
   // Check per-user rec cache

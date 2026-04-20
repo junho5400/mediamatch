@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { verifyAuth, AuthError } from "@/lib/auth/verifyAuth"
-import { getUserMediaEntries } from "@/lib/firebase/firestore"
+import { getUserMediaEntriesAdmin } from "@/lib/firebase/firestore-admin"
 
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || "http://localhost:8000"
 
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const entries = await getUserMediaEntries(userId)
+    const entries = await getUserMediaEntriesAdmin(userId)
     if (!entries?.length) {
       return NextResponse.json({ description: "" })
     }
