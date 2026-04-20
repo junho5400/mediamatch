@@ -3,8 +3,9 @@ import { verifyAuth, AuthError } from "@/lib/auth/verifyAuth"
 import { getRecommendations, clearCache } from "@/lib/recommendations/getRecommendations"
 
 export async function GET(req: NextRequest) {
+  let userId: string
   try {
-    await verifyAuth(req)
+    ;({ userId } = await verifyAuth(req))
   } catch (err) {
     if (err instanceof AuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status })
@@ -13,10 +14,9 @@ export async function GET(req: NextRequest) {
   }
 
   const type = req.nextUrl.searchParams.get("type")
-  const userId = req.nextUrl.searchParams.get("userId")
 
   const validTypes = ["personal", "broaden", "for_you", "popular"]
-  if (!type || !userId || !validTypes.includes(type)) {
+  if (!type || !validTypes.includes(type)) {
     return NextResponse.json({ error: "Invalid parameters" }, { status: 400 })
   }
 
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const refresh = req.nextUrl.searchParams.get("refresh") === "1"
-    if (refresh && userId) {
+    if (refresh) {
       clearCache(userId)
     }
     const recommendations = await getRecommendations(intent, userId)
